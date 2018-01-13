@@ -17,8 +17,12 @@ int main(int argc, char **argv)
     int opt = 0;
     int port = 8080;
     int listenfd = 0;
+    int socketfd = 0;
+    int pid = 0;
 
     static struct sockaddr_in serv_addr;
+    static struct sockaddr_in cli_addr;
+    socklen_t len = 0;
 
     while ((opt = getopt(argc, argv, "p:h")) != -1) {
         switch (opt) {
@@ -45,4 +49,44 @@ int main(int argc, char **argv)
     serv_addr.sin_family = AF_INET;
 	serv_addr.sin_addr.s_addr = htonl(INADDR_ANY);
 	serv_addr.sin_port = htons(port);
+
+    if (bind(listenfd, (struct sockaddr *) &serv_addr, sizeof(serv_addr)) < 0) {
+		fprintf(stderr, "Cannot bind port\n");
+        return EXIT_FAILURE;
+    }
+
+	if (listen(listenfd, 64) < 0) {
+        fprintf(stderr, "Cannot listen on port\n");
+        return EXIT_FAILURE;
+    }
+
+    for (;;) {
+		len = sizeof(cli_addr);
+
+        socketfd = accept(listenfd, (struct sockaddr *)&cli_addr, &len);
+
+        char client_address[INET_ADDRSTRLEN];
+        inet_ntop(AF_INET, &(cli_addr.sin_addr), client_address, INET_ADDRSTRLEN);
+
+		if (socketfd < 0) {
+            fprintf(stderr, "Cannot accept incoming connection from %s\n", client_address);
+            (void) close(socketfd);
+            continue;
+        }
+
+        printf("Incoming connection from %s", client_address);
+
+        pid = fork();
+		if (pid < 0) {
+			fprintf(stderr, "Cannot fork!\n");
+            return EXIT_FAILURE;
+		}
+
+        if (pid == 0) {
+			(void) close(listenfd);
+			/* Aca tendriamos que manejar la peticion */
+		} else {
+			(void) close(socketfd);
+		}
+	}
 }
