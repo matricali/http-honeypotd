@@ -69,6 +69,7 @@ int main(int argc, char **argv)
     int listenfd = 0;
     int socketfd = 0;
     int pid = 0;
+    int iEnabled = 1;
 
     static struct sockaddr_in serv_addr;
     static struct sockaddr_in cli_addr;
@@ -95,6 +96,9 @@ int main(int argc, char **argv)
 		fprintf(stderr, "Error opening listen socket.\n");
         return EXIT_FAILURE;
     }
+
+    setsockopt(listenfd, SOL_SOCKET, SO_REUSEADDR, (char*) &iEnabled,
+        sizeof(iEnabled));
 
     serv_addr.sin_family = AF_INET;
 	serv_addr.sin_addr.s_addr = htonl(INADDR_ANY);
