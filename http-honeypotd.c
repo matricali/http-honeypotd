@@ -23,6 +23,8 @@ struct mime_type mime_types [] = {
 	{"ico", "image/ico"},
 	{"htm", "text/html"},
 	{"html", "text/html"},
+    {"js", "application/x-javascript"},
+    {"css", "text/css"},
 	{0, 0}
 };
 
@@ -34,6 +36,7 @@ void usage(char *ex)
 void process_request(int socket_fd)
 {
 	long i;
+    int n;
     long ret;
 	static char buffer[BUFSIZE + 1];
 
@@ -70,6 +73,23 @@ void process_request(int socket_fd)
     			break;
     		}
     	}
+
+        /* No permitir .. */
+        for (n = 0; n < i - 1; n++) {
+    		if (buffer[n] == '.' && buffer[n + 1] == '.') {
+                (void) sprintf(
+                    buffer,
+                    "HTTP/1.1 400 Bad Request\nServer: %s\nContent-Length: 0\nConnection: close\n\n",
+                    SERVER_HEADER
+                );
+
+                (void) write(socket_fd, buffer, strlen(buffer));
+
+            	sleep(1);
+            	close(socket_fd);
+            	exit(1);
+    		}
+        }
 
         int inputfile_fd = 0;
         long content_length = 0;
