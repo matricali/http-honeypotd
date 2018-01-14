@@ -5,6 +5,7 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <string.h>
+#include <fcntl.h>
 
 #define BUFSIZE 8096
 #define SERVER_HEADER "jorgee"
@@ -45,15 +46,47 @@ void process_request(int socket_fd)
 
     printf("REQUEST >> %s\n", buffer);
 
-    char *body = "puto el que lee\n";
+    if (strncmp(buffer, "GET ", 4) == 0 || strncmp(buffer, "get ", 4) == 0) {
+        /* HTTP 1.x GET */
+        for (i = 4; i < BUFSIZE; i++) {
+    		if (buffer[i] == ' ') {
+    			buffer[i] = 0;
+    			break;
+    		}
+    	}
 
-    (void) sprintf(
-        buffer,
-        "HTTP/1.1 200 OK\nServer: %s\nContent-Length: %ld\nConnection: close\nContent-Type: text/plain\n\n%s",
-        SERVER_HEADER,
-        strlen(body),
-        body
-    );
+        int inputfile_fd = 0;
+        long content_length = 0;
+        if ((inputfile_fd = open(&buffer[5], O_RDONLY)) == -1) {
+            (void) sprintf(
+                buffer,
+                "HTTP/1.1 404 Not Found\nServer: %s\nContent-Length: 0\nConnection: close\n\n",
+                SERVER_HEADER
+            );
+    	} else {
+            content_length = (long)lseek(inputfile_fd, (off_t)0, SEEK_END);
+            lseek(inputfile_fd, (off_t)0, SEEK_SET);
+            sprintf(
+                buffer,
+                "HTTP/1.1 200 OK\nServer: %s\nContent-Length: %ld\nConnection: close\nContent-Type: text/plain\n\n",
+                SERVER_HEADER,
+                content_length
+            );
+            /* Enviamos los headers */
+            (void) write(socket_fd, buffer, strlen(buffer));
+
+            while ((ret = read(inputfile_fd, buffer, BUFSIZE)) > 0) {
+        		(void) write(socket_fd, buffer, ret);
+        	}
+        }
+    } else {
+        /* Unsupported method */
+        (void) sprintf(
+            buffer,
+            "HTTP/1.1 405 Method Not Allowed\nServer: %s\nContent-Length: 0\nConnection: close\n\n",
+            SERVER_HEADER
+        );
+    }
 
 	(void) write(socket_fd, buffer, strlen(buffer));
 
@@ -111,6 +144,11 @@ int main(int argc, char **argv)
 
 	if (listen(listenfd, 64) < 0) {
         fprintf(stderr, "Cannot listen on port\n");
+        return EXIT_FAILURE;
+    }
+
+    if (chdir("./public/") == -1) {
+        fprintf(stderr, "Cannot change directory\n");
         return EXIT_FAILURE;
     }
 
