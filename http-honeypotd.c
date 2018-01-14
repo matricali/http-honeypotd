@@ -10,6 +10,22 @@
 #define BUFSIZE 8096
 #define SERVER_HEADER "jorgee"
 
+struct mime_type {
+    char *extension;
+	char *mimetype;
+};
+
+struct mime_type mime_types [] = {
+	{"gif", "image/gif"},
+	{"jpg", "image/jpg"},
+	{"jpeg", "image/jpeg"},
+	{"png", "image/png"},
+	{"ico", "image/ico"},
+	{"htm", "text/html"},
+	{"html", "text/html"},
+	{0, 0}
+};
+
 void usage(char *ex)
 {
     printf("usage: %s [-p PORT]\n", ex);
@@ -57,6 +73,22 @@ void process_request(int socket_fd)
 
         int inputfile_fd = 0;
         long content_length = 0;
+        char *content_type = 0;
+        int len = 0;
+        int buflen = strlen(buffer);
+
+        for (i = 0; mime_types[i].extension != 0; i++) {
+    		len = strlen(mime_types[i].extension);
+    		if (!strncmp(&buffer[buflen - len], mime_types[i].extension, len)) {
+    			content_type = mime_types[i].mimetype;
+    			break;
+    		}
+    	}
+
+        if (content_type == 0) {
+            content_type = "text/plain";
+        }
+
         if ((inputfile_fd = open(&buffer[5], O_RDONLY)) == -1) {
             (void) sprintf(
                 buffer,
@@ -68,9 +100,10 @@ void process_request(int socket_fd)
             lseek(inputfile_fd, (off_t)0, SEEK_SET);
             sprintf(
                 buffer,
-                "HTTP/1.1 200 OK\nServer: %s\nContent-Length: %ld\nConnection: close\nContent-Type: text/plain\n\n",
+                "HTTP/1.1 200 OK\nServer: %s\nContent-Length: %ld\nConnection: close\nContent-Type: %s\n\n",
                 SERVER_HEADER,
-                content_length
+                content_length,
+                content_type
             );
             /* Enviamos los headers */
             (void) write(socket_fd, buffer, strlen(buffer));
