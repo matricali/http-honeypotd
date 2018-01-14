@@ -25,6 +25,8 @@ SOFTWARE.
 #include <stdlib.h>
 #include <stdio.h>
 #include <unistd.h>
+#include <stdarg.h>
+#include <time.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
@@ -52,9 +54,42 @@ struct mime_type mime_types [] = {
 	{0, 0}
 };
 
+FILE *logfile = NULL;
+
 void usage(char *ex)
 {
     printf("usage: %s [-p PORT]\n", ex);
+}
+
+void logger(const char *format, ...) {
+    va_list arg;
+    char message[1024];
+    char datetime[26];
+    int ret;
+
+    time_t timer;
+    struct tm* tm_info;
+
+    if (logfile == NULL) {
+        logfile = fopen("http-honeypotd.log", "a");
+        if (logfile < 0) {
+            fprintf(stderr, "Error opening log file.\n");
+            return;
+        }
+    }
+
+    time(&timer);
+    tm_info = localtime(&timer);
+    strftime(datetime, 26, "%Y-%m-%d %H:%M:%S", tm_info);
+
+    memset(message, 0, 1024);
+
+    va_start(arg, format);
+    ret = vsprintf(message, format, arg);
+    va_end(arg);
+
+    fprintf(logfile, "[%s][%d] %s", datetime, getpid(), message);
+    printf("[%s][%d] %s", datetime, getpid(), message);
 }
 
 void process_request(int socket_fd)
@@ -87,7 +122,7 @@ void process_request(int socket_fd)
         }
     }
 
-    printf("REQUEST >> %s\n", buffer);
+    logger("REQUEST >> %s\n", buffer);
 
     if (strncmp(buffer, "GET ", 4) == 0 || strncmp(buffer, "get ", 4) == 0) {
         /* HTTP 1.x GET */
@@ -252,7 +287,7 @@ int main(int argc, char **argv)
             return EXIT_FAILURE;
         }
 
-        printf("Incoming connection from %s\n", client_address);
+        logger("Incoming connection from %s\n", client_address);
 
         pid = fork();
 		if (pid < 0) {
