@@ -174,94 +174,103 @@ void process_request(int socket_fd)
         h++;
     }
 
-    logger(LOG_INFO, "method=%s,path=%s,protocol=%s\n", request.method,
-        request.path, request.protocol);
+    logger(LOG_INFO, "method=%s,path=%s,protocol=%s\n---REQUEST-START---\n%s\n---REQUEST-END---\n",
+        request.method, request.path, request.protocol, buffer);
 
-    logger(LOG_INFO, "%s\n", buffer);
+    /* No permitir .. (directory transversal) */
+    if (strstr(request.path, "..") != NULL) {
+        logger(LOG_WARNING, "Possible directory transversal attemp !!\n");
 
-    if (strncmp(buffer, "GET ", 4) == 0 || strncmp(buffer, "get ", 4) == 0) {
-        /* HTTP 1.x GET */
-        for (i = 4; i < BUFSIZE; i++) {
-    		if (buffer[i] == ' ') {
-    			buffer[i] = 0;
-    			break;
-    		}
-    	}
+        sprintf(
+            buffer,
+            "HTTP/1.1 400 Bad Request\nServer: %s\nContent-Length: 0\nConnection: close\n\n",
+            SERVER_HEADER
+        );
 
-        /* No permitir .. */
-        for (n = 0; n < i - 1; n++) {
-    		if (buffer[n] == '.' && buffer[n + 1] == '.') {
-                (void) sprintf(
-                    buffer,
-                    "HTTP/1.1 400 Bad Request\nServer: %s\nContent-Length: 0\nConnection: close\n\n",
-                    SERVER_HEADER
-                );
+        write(socket_fd, buffer, strlen(buffer));
 
-                (void) write(socket_fd, buffer, strlen(buffer));
+        sleep(1);
+        close(socket_fd);
+        exit(1);
+    }
 
-            	sleep(1);
-            	close(socket_fd);
-            	exit(1);
-    		}
-        }
+    if (strcmp("GET", request.method) != 0 &&
+        strcmp("HEAD", request.method) != 0) {
+        logger(LOG_WARNING, "Unsupported method (%s) !!\n", request.method);
 
-        /* index */
-        if (strcmp("/", buffer+4) == 0) {
-            strcpy(buffer+4, "/index.html\0");
-        }
-
-
-        int inputfile_fd = 0;
-        long content_length = 0;
-        char *content_type = 0;
-        int len = 0;
-        int buflen = strlen(buffer);
-
-
-        /* Detectar mime-type */
-        for (i = 0; mime_types[i].extension != 0; i++) {
-    		len = strlen(mime_types[i].extension);
-    		if (!strncmp(&buffer[buflen - len], mime_types[i].extension, len)) {
-    			content_type = mime_types[i].mimetype;
-    			break;
-    		}
-    	}
-
-        if (content_type == 0) {
-            content_type = "text/plain";
-        }
-
-        /* Existe el archivo? */
-        if ((inputfile_fd = open(&buffer[5], O_RDONLY)) == -1) {
-            (void) sprintf(
-                buffer,
-                "HTTP/1.1 404 Not Found\nServer: %s\nContent-Length: 0\nConnection: close\n\n",
-                SERVER_HEADER
-            );
-    	} else {
-            content_length = (long)lseek(inputfile_fd, (off_t)0, SEEK_END);
-            lseek(inputfile_fd, (off_t)0, SEEK_SET);
-            sprintf(
-                buffer,
-                "HTTP/1.1 200 OK\nServer: %s\nContent-Length: %ld\nConnection: close\nContent-Type: %s\n\n",
-                SERVER_HEADER,
-                content_length,
-                content_type
-            );
-            /* Enviamos los headers */
-            (void) write(socket_fd, buffer, strlen(buffer));
-
-            while ((ret = read(inputfile_fd, buffer, BUFSIZE)) > 0) {
-        		(void) write(socket_fd, buffer, ret);
-        	}
-        }
-    } else {
-        /* Unsupported method */
-        (void) sprintf(
+        sprintf(
             buffer,
             "HTTP/1.1 405 Method Not Allowed\nServer: %s\nContent-Length: 0\nConnection: close\n\n",
             SERVER_HEADER
         );
+
+        write(socket_fd, buffer, strlen(buffer));
+
+        sleep(1);
+        close(socket_fd);
+        exit(1);
+    }
+
+    /* Directory index */
+    if (strcmp("/", request.path) == 0) {
+        strcpy(request.path, "/index.html\0");
+    }
+
+
+    int inputfile_fd = 0;
+    long content_length = 0;
+    char *content_type = 0;
+    int len = 0;
+    int buflen = strlen(buffer);
+    char filename[1024];
+
+    if (request.path[0] == '/') {
+        strcpy(filename, &request.path[1]);
+    } else {
+        strcpy(filename, request.path);
+    }
+
+    printf("filename=%s\n", filename);
+
+    /* Detectar mime-type */
+    for (i = 0; mime_types[i].extension != 0; i++) {
+		len = strlen(mime_types[i].extension);
+		if (!strncmp(&filename[strlen(filename) - len], mime_types[i].extension, len)) {
+			content_type = mime_types[i].mimetype;
+			break;
+		}
+	}
+
+    if (content_type == 0) {
+        content_type = "text/plain";
+    }
+
+    /* Existe el archivo? */
+    if ((inputfile_fd = open(filename, O_RDONLY)) == -1) {
+        (void) sprintf(
+            buffer,
+            "HTTP/1.1 404 Not Found\nServer: %s\nContent-Length: 0\nConnection: close\n\n",
+            SERVER_HEADER
+        );
+	} else {
+        content_length = (long)lseek(inputfile_fd, (off_t)0, SEEK_END);
+        lseek(inputfile_fd, (off_t)0, SEEK_SET);
+        sprintf(
+            buffer,
+            "HTTP/1.1 200 OK\nServer: %s\nContent-Length: %ld\nConnection: close\nContent-Type: %s\n\n",
+            SERVER_HEADER,
+            content_length,
+            content_type
+        );
+        /* Enviamos los headers */
+        (void) write(socket_fd, buffer, strlen(buffer));
+
+        if (strcmp("HEAD", request.method) != 0) {
+            /* Si es una peticion HEAD no enviamos el body */
+            while ((ret = read(inputfile_fd, buffer, BUFSIZE)) > 0) {
+        		(void) write(socket_fd, buffer, ret);
+        	}
+        }
     }
 
 	(void) write(socket_fd, buffer, strlen(buffer));
