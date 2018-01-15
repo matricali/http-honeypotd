@@ -38,20 +38,20 @@ SOFTWARE.
 
 struct mime_type {
     char *extension;
-	char *mimetype;
+    char *mimetype;
 };
 
 struct mime_type mime_types [] = {
-	{"gif", "image/gif"},
-	{"jpg", "image/jpg"},
-	{"jpeg", "image/jpeg"},
-	{"png", "image/png"},
-	{"ico", "image/ico"},
-	{"htm", "text/html"},
-	{"html", "text/html"},
+    {"gif", "image/gif"},
+    {"jpg", "image/jpg"},
+    {"jpeg", "image/jpeg"},
+    {"png", "image/png"},
+    {"ico", "image/ico"},
+    {"htm", "text/html"},
+    {"html", "text/html"},
     {"js", "application/x-javascript"},
     {"css", "text/css"},
-	{0, 0}
+    {0, 0}
 };
 
 struct http_request {
@@ -121,25 +121,25 @@ void logger(enum log_level level, const char *format, ...) {
 
 void process_request(int socket_fd)
 {
-	long i;
+    long i;
     int n;
     long ret;
 
-	static char buffer[BUFSIZE + 1];
+    static char buffer[BUFSIZE + 1];
     struct http_request request = {};
 
-	ret = read(socket_fd, buffer, BUFSIZE);
+    ret = read(socket_fd, buffer, BUFSIZE);
 
-	if (ret == 0 || ret == -1) {
+    if (ret == 0 || ret == -1) {
         (void) write(socket_fd, "HTTP/1.1 403 Forbidden\nContent-Length: 185\nConnection: close\nContent-Type: text/html\n\n<html><head>\n<title>403 Forbidden</title>\n</head><body>\n<h1>Forbidden</h1>\nThe requested URL, file type or operation is not allowed on this simple static file webserver.\n</body></html>\n", 271);
         (void) close(socket_fd);
 
         logger(LOG_ERROR, "HTTP/1.1 403 Forbidden\tFailed to read browser request.\n");
-	}
+    }
 
-	if (ret > 0 && ret < BUFSIZE) {
+    if (ret > 0 && ret < BUFSIZE) {
         /* Cerrar buffer */
-		buffer[ret] = 0;
+        buffer[ret] = 0;
     } else {
         buffer[0] = 0;
     }
@@ -175,7 +175,7 @@ void process_request(int socket_fd)
     }
 
     logger(LOG_INFO, "method=%s,path=%s,protocol=%s\n---REQUEST-START---\n%s\n---REQUEST-END---\n",
-        request.method, request.path, request.protocol, buffer);
+    request.method, request.path, request.protocol, buffer);
 
     /* No soportamos HTTP/2.0 :( */
     if (strcmp("HTTP/2.0", request.protocol) == 0) {
@@ -197,7 +197,7 @@ void process_request(int socket_fd)
 
     /* Si el protocolo no es HTTP/1.0 o HTTP/1.1 cierro la conexion */
     if (strcmp("HTTP/1.0", request.protocol) != 0 &&
-        strcmp("HTTP/1.1", request.protocol) != 0) {
+    strcmp("HTTP/1.1", request.protocol) != 0) {
         logger(LOG_WARNING, "Unsupported protocol (%s) !!\n", request.protocol);
 
         close(socket_fd);
@@ -206,7 +206,7 @@ void process_request(int socket_fd)
 
     /* Verificamos si el metodo esta soportado */
     if (strcmp("GET", request.method) != 0 &&
-        strcmp("HEAD", request.method) != 0) {
+    strcmp("HEAD", request.method) != 0) {
         logger(LOG_WARNING, "Unsupported method (%s) !!\n", request.method);
 
         sprintf(
@@ -263,12 +263,12 @@ void process_request(int socket_fd)
 
     /* Detectar mime-type */
     for (i = 0; mime_types[i].extension != 0; i++) {
-		len = strlen(mime_types[i].extension);
-		if (!strncmp(&filename[strlen(filename) - len], mime_types[i].extension, len)) {
-			content_type = mime_types[i].mimetype;
-			break;
-		}
-	}
+        len = strlen(mime_types[i].extension);
+        if (!strncmp(&filename[strlen(filename) - len], mime_types[i].extension, len)) {
+            content_type = mime_types[i].mimetype;
+            break;
+        }
+    }
 
     if (content_type == 0) {
         content_type = "text/plain";
@@ -281,7 +281,7 @@ void process_request(int socket_fd)
             "HTTP/1.1 404 Not Found\nServer: %s\nContent-Length: 0\nConnection: close\n\n",
             SERVER_HEADER
         );
-	} else {
+    } else {
         content_length = (long)lseek(inputfile_fd, (off_t)0, SEEK_END);
         lseek(inputfile_fd, (off_t)0, SEEK_SET);
         sprintf(
@@ -297,16 +297,16 @@ void process_request(int socket_fd)
         if (strcmp("HEAD", request.method) != 0) {
             /* Si es una peticion HEAD no enviamos el body */
             while ((ret = read(inputfile_fd, buffer, BUFSIZE)) > 0) {
-        		(void) write(socket_fd, buffer, ret);
-        	}
+                (void) write(socket_fd, buffer, ret);
+            }
         }
     }
 
-	(void) write(socket_fd, buffer, strlen(buffer));
+    (void) write(socket_fd, buffer, strlen(buffer));
 
-	sleep(1);
-	close(socket_fd);
-	exit(1);
+    sleep(1);
+    close(socket_fd);
+    exit(1);
 }
 
 int main(int argc, char **argv)
@@ -325,14 +325,14 @@ int main(int argc, char **argv)
     while ((opt = getopt(argc, argv, "p:h")) != -1) {
         switch (opt) {
             case 'p':
-                port = atoi(optarg);
-                break;
+            port = atoi(optarg);
+            break;
 
             case 'h':
-                printf("http-honeypotd v0.1a\n(c) 2017 Jorge Matricali\n\n");
+            printf("http-honeypotd v0.1a\n(c) 2017 Jorge Matricali\n\n");
             default:
-                usage(argv[0]);
-                exit(EXIT_FAILURE);
+            usage(argv[0]);
+            exit(EXIT_FAILURE);
         }
     }
 
@@ -340,23 +340,23 @@ int main(int argc, char **argv)
 
     listenfd = socket(AF_INET, SOCK_STREAM, 0);
     if (listenfd < 0) {
-		logger(LOG_FATAL, "Error opening listen socket.\n");
+        logger(LOG_FATAL, "Error opening listen socket.\n");
         return EXIT_FAILURE;
     }
 
     setsockopt(listenfd, SOL_SOCKET, SO_REUSEADDR, (char*) &iEnabled,
-        sizeof(iEnabled));
+    sizeof(iEnabled));
 
     serv_addr.sin_family = AF_INET;
-	serv_addr.sin_addr.s_addr = htonl(INADDR_ANY);
-	serv_addr.sin_port = htons(port);
+    serv_addr.sin_addr.s_addr = htonl(INADDR_ANY);
+    serv_addr.sin_port = htons(port);
 
     if (bind(listenfd, (struct sockaddr *) &serv_addr, sizeof(serv_addr)) < 0) {
-		logger(LOG_FATAL, "Cannot bind port\n");
+        logger(LOG_FATAL, "Cannot bind port\n");
         return EXIT_FAILURE;
     }
 
-	if (listen(listenfd, 64) < 0) {
+    if (listen(listenfd, 64) < 0) {
         logger(LOG_FATAL, "Cannot listen on port\n");
         return EXIT_FAILURE;
     }
@@ -367,14 +367,14 @@ int main(int argc, char **argv)
     }
 
     for (;;) {
-		len = sizeof(cli_addr);
+        len = sizeof(cli_addr);
 
         socketfd = accept(listenfd, (struct sockaddr *) &cli_addr, &len);
 
         char client_address[INET_ADDRSTRLEN];
         inet_ntop(AF_INET, &(cli_addr.sin_addr), client_address, INET_ADDRSTRLEN);
 
-		if (socketfd < 0) {
+        if (socketfd < 0) {
             logger(LOG_FATAL, "Cannot accept incoming connection from %s\n", client_address);
             (void) close(socketfd);
             return EXIT_FAILURE;
@@ -383,16 +383,16 @@ int main(int argc, char **argv)
         logger(LOG_INFO, "Incoming connection from %s\n", client_address);
 
         pid = fork();
-		if (pid < 0) {
-			logger(LOG_FATAL, "Cannot fork!\n");
+        if (pid < 0) {
+            logger(LOG_FATAL, "Cannot fork!\n");
             return EXIT_FAILURE;
-		}
+        }
 
         if (pid == 0) {
-			(void) close(listenfd);
-			process_request(socketfd);
-		} else {
-			(void) close(socketfd);
-		}
-	}
+            (void) close(listenfd);
+            process_request(socketfd);
+        } else {
+            (void) close(socketfd);
+        }
+    }
 }

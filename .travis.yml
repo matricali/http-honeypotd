@@ -1,0 +1,16 @@
+language: c
+
+dist: trusty
+sudo: false
+
+env:
+  global:
+  - CFLAGS="-Wall -g -std=gnu99 -O3"
+  - CPPFLAGS="-D_DEFAULT_SOURCE"
+
+compiler:
+  - gcc
+  - clang
+
+script:
+  - make
