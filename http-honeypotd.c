@@ -177,13 +177,13 @@ void process_request(int socket_fd)
     logger(LOG_INFO, "method=%s,path=%s,protocol=%s\n---REQUEST-START---\n%s\n---REQUEST-END---\n",
         request.method, request.path, request.protocol, buffer);
 
-    /* No permitir .. (directory transversal) */
-    if (strstr(request.path, "..") != NULL || strstr(request.path, "//") != NULL) {
-        logger(LOG_WARNING, "Possible directory transversal attemp !!\n");
+    /* No soportamos HTTP/2.0 :( */
+    if (strcmp("HTTP/2.0", request.protocol) == 0) {
+        logger(LOG_WARNING, "Unsupported protocol (%s) !!\n", request.protocol);
 
         sprintf(
             buffer,
-            "HTTP/1.1 400 Bad Request\nServer: %s\nContent-Length: 0\nConnection: close\n\n",
+            "HTTP/1.1 505 HTTP Version Not Supported\nServer: %s\nContent-Length: 0\nConnection: close\n\n",
             SERVER_HEADER
         );
 
@@ -194,6 +194,17 @@ void process_request(int socket_fd)
         exit(1);
     }
 
+
+    /* Si el protocolo no es HTTP/1.0 o HTTP/1.1 cierro la conexion */
+    if (strcmp("HTTP/1.0", request.protocol) != 0 &&
+        strcmp("HTTP/1.1", request.protocol) != 0) {
+        logger(LOG_WARNING, "Unsupported protocol (%s) !!\n", request.protocol);
+
+        close(socket_fd);
+        exit(1);
+    }
+
+    /* Verificamos si el metodo esta soportado */
     if (strcmp("GET", request.method) != 0 &&
         strcmp("HEAD", request.method) != 0) {
         logger(LOG_WARNING, "Unsupported method (%s) !!\n", request.method);
@@ -201,6 +212,23 @@ void process_request(int socket_fd)
         sprintf(
             buffer,
             "HTTP/1.1 405 Method Not Allowed\nServer: %s\nContent-Length: 0\nConnection: close\n\n",
+            SERVER_HEADER
+        );
+
+        write(socket_fd, buffer, strlen(buffer));
+
+        sleep(1);
+        close(socket_fd);
+        exit(1);
+    }
+
+    /* No permitir .. o // (directory transversal) */
+    if (strstr(request.path, "..") != NULL || strstr(request.path, "//") != NULL) {
+        logger(LOG_WARNING, "Possible directory transversal attemp !!\n");
+
+        sprintf(
+            buffer,
+            "HTTP/1.1 400 Bad Request\nServer: %s\nContent-Length: 0\nConnection: close\n\n",
             SERVER_HEADER
         );
 
