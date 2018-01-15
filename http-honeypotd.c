@@ -54,6 +54,12 @@ struct mime_type mime_types [] = {
 	{0, 0}
 };
 
+struct http_request {
+    char method[50];
+    char path[1024];
+    char protocol[100];
+};
+
 enum log_level {
     LOG_NONE,
     LOG_FATAL,
@@ -118,7 +124,9 @@ void process_request(int socket_fd)
 	long i;
     int n;
     long ret;
+
 	static char buffer[BUFSIZE + 1];
+    struct http_request request = {};
 
 	ret = read(socket_fd, buffer, BUFSIZE);
 
@@ -136,12 +144,38 @@ void process_request(int socket_fd)
         buffer[0] = 0;
     }
 
-	for (i = 0; i < ret; i++) {
-        /* Eliminar CR LF */
-		if (buffer[i] == '\r' || buffer[i] == '\n') {
-			buffer[i] = '*';
+    /* Parsear cabeceras */
+    int h = 0;
+    for (i = 0; i < ret; i++) {
+        if (buffer[i] == ' ') {
+            request.method[h] = 0;
+            i++;
+            break;
         }
+        request.method[h] = buffer[i];
+        h++;
     }
+    for (h = 0; i < ret; i++) {
+        if (buffer[i] == ' ') {
+            request.path[h] = 0;
+            i++;
+            break;
+        }
+        request.path[h] = buffer[i];
+        h++;
+    }
+    for (h = 0; i < ret-1; i++) {
+        if (buffer[i] == '\r' && buffer[i+1] == '\n') {
+            request.protocol[h] = 0;
+            i++;
+            break;
+        }
+        request.protocol[h] = buffer[i];
+        h++;
+    }
+
+    logger(LOG_INFO, "method=%s,path=%s,protocol=%s\n", request.method,
+        request.path, request.protocol);
 
     logger(LOG_INFO, "%s\n", buffer);
 
