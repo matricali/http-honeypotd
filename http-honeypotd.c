@@ -54,6 +54,17 @@ struct mime_type mime_types [] = {
 	{0, 0}
 };
 
+enum log_level {
+    LOG_NONE,
+    LOG_FATAL,
+    LOG_ERROR,
+    LOG_WARNING,
+    LOG_NOTICE,
+    LOG_INFO,
+    LOG_DEBUG,
+    LOG_NEVER
+};
+
 FILE *logfile = NULL;
 
 void usage(char *ex)
@@ -61,7 +72,11 @@ void usage(char *ex)
     printf("usage: %s [-p PORT]\n", ex);
 }
 
-void logger(const char *format, ...) {
+void logger(enum log_level level, const char *format, ...) {
+    if (level == LOG_NEVER || level == LOG_NONE) {
+        return;
+    }
+
     va_list arg;
     char message[1024];
     char datetime[26];
@@ -73,8 +88,7 @@ void logger(const char *format, ...) {
     if (logfile == NULL) {
         logfile = fopen("http-honeypotd.log", "a");
         if (logfile < 0) {
-            fprintf(stderr, "Error opening log file.\n");
-            return;
+            logger(LOG_ERROR, "Error opening log file.\n");
         }
     }
 
@@ -88,8 +102,15 @@ void logger(const char *format, ...) {
     ret = vsprintf(message, format, arg);
     va_end(arg);
 
-    fprintf(logfile, "[%s][%d] %s", datetime, getpid(), message);
-    printf("[%s][%d] %s", datetime, getpid(), message);
+    if (logfile > 0) {
+        fprintf(logfile, "[%s][%d] %s", datetime, getpid(), message);
+    }
+
+    if (level < LOG_WARNING) {
+        fprintf(stderr, "[%s][%d] %s", datetime, getpid(), message);
+    } else if (level <= LOG_DEBUG) {
+        printf("[%s][%d] %s", datetime, getpid(), message);
+    }
 }
 
 void process_request(int socket_fd)
@@ -105,7 +126,7 @@ void process_request(int socket_fd)
         (void) write(socket_fd, "HTTP/1.1 403 Forbidden\nContent-Length: 185\nConnection: close\nContent-Type: text/html\n\n<html><head>\n<title>403 Forbidden</title>\n</head><body>\n<h1>Forbidden</h1>\nThe requested URL, file type or operation is not allowed on this simple static file webserver.\n</body></html>\n", 271);
         (void) close(socket_fd);
 
-        fprintf(stderr, "%s\tHTTP/1.1 403 Forbidden\tFailed to read browser request.\n", "asdsd");
+        logger(LOG_ERROR, "HTTP/1.1 403 Forbidden\tFailed to read browser request.\n");
 	}
 
 	if (ret > 0 && ret < BUFSIZE) {
@@ -122,7 +143,7 @@ void process_request(int socket_fd)
         }
     }
 
-    logger("REQUEST >> %s\n", buffer);
+    logger(LOG_INFO, "%s\n", buffer);
 
     if (strncmp(buffer, "GET ", 4) == 0 || strncmp(buffer, "get ", 4) == 0) {
         /* HTTP 1.x GET */
@@ -247,7 +268,7 @@ int main(int argc, char **argv)
 
     listenfd = socket(AF_INET, SOCK_STREAM, 0);
     if (listenfd < 0) {
-		fprintf(stderr, "Error opening listen socket.\n");
+		logger(LOG_FATAL, "Error opening listen socket.\n");
         return EXIT_FAILURE;
     }
 
@@ -259,17 +280,17 @@ int main(int argc, char **argv)
 	serv_addr.sin_port = htons(port);
 
     if (bind(listenfd, (struct sockaddr *) &serv_addr, sizeof(serv_addr)) < 0) {
-		fprintf(stderr, "Cannot bind port\n");
+		logger(LOG_FATAL, "Cannot bind port\n");
         return EXIT_FAILURE;
     }
 
 	if (listen(listenfd, 64) < 0) {
-        fprintf(stderr, "Cannot listen on port\n");
+        logger(LOG_FATAL, "Cannot listen on port\n");
         return EXIT_FAILURE;
     }
 
     if (chdir("./public/") == -1) {
-        fprintf(stderr, "Cannot change directory\n");
+        logger(LOG_FATAL, "Cannot change directory\n");
         return EXIT_FAILURE;
     }
 
@@ -282,16 +303,16 @@ int main(int argc, char **argv)
         inet_ntop(AF_INET, &(cli_addr.sin_addr), client_address, INET_ADDRSTRLEN);
 
 		if (socketfd < 0) {
-            fprintf(stderr, "Cannot accept incoming connection from %s\n", client_address);
+            logger(LOG_FATAL, "Cannot accept incoming connection from %s\n", client_address);
             (void) close(socketfd);
             return EXIT_FAILURE;
         }
 
-        logger("Incoming connection from %s\n", client_address);
+        logger(LOG_INFO, "Incoming connection from %s\n", client_address);
 
         pid = fork();
 		if (pid < 0) {
-			fprintf(stderr, "Cannot fork!\n");
+			logger(LOG_FATAL, "Cannot fork!\n");
             return EXIT_FAILURE;
 		}
 
