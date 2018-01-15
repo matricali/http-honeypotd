@@ -178,7 +178,7 @@ void process_request(int socket_fd)
         request.method, request.path, request.protocol, buffer);
 
     /* No permitir .. (directory transversal) */
-    if (strstr(request.path, "..") != NULL) {
+    if (strstr(request.path, "..") != NULL || strstr(request.path, "//") != NULL) {
         logger(LOG_WARNING, "Possible directory transversal attemp !!\n");
 
         sprintf(
@@ -211,6 +211,7 @@ void process_request(int socket_fd)
         exit(1);
     }
 
+
     /* Directory index */
     if (strcmp("/", request.path) == 0) {
         strcpy(request.path, "/index.html\0");
@@ -230,7 +231,7 @@ void process_request(int socket_fd)
         strcpy(filename, request.path);
     }
 
-    printf("filename=%s\n", filename);
+    logger(LOG_DEBUG, "filename=%s\n", filename);
 
     /* Detectar mime-type */
     for (i = 0; mime_types[i].extension != 0; i++) {
